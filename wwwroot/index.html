@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Автосервис - Вход</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #f0f2f5;
+        }
+
+        .login-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #error {
+            color: red;
+            font-size: 0.9rem;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-card" id="login-form">
+        <h2>Вход в систему</h2>
+        <div id="error">Неверный логин или пароль</div>
+        <input type="text" id="username" placeholder="Логин">
+        <input type="password" id="password" placeholder="Пароль">
+        <button onclick="login()">Войти</button>
+    </div>
+
+    <script>
+        async function login() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error');
+
+            try {
+                // Отправляем запрос на ваш API
+                const response = await fetch('http://localhost:5032/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    // СОХРАНЯЕМ ТОКЕН в браузере (localStorage)
+                    localStorage.setItem('jwt_token', data.token);
+
+                    alert('Успешный вход!');
+                    window.location.href = 'dashboard.html';
+                } else {
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                console.error('Ошибка сети:', err);
+                alert('Сервер недоступен. Проверьте, запущен ли бэкенд.');
+            }
+        }
+    </script>
+
+</body>
+
+</html>

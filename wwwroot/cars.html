@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Машины клиента</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <nav>
+        <a href="dashboard.html">👥 Клиенты</a>
+        <a href="employees.html">👨‍🔧 Сотрудники</a>
+        <a href="report.html">📈 Отчеты</a>
+    </nav>
+
+    <div class="container">
+        <a href="dashboard.html" class="back-link">← Назад к клиентам</a>
+        <h2 id="title">Машины клиента</h2>
+
+        <table id="cars-table">
+            <thead>
+                <tr>
+                    <th>Марка/Модель</th>
+                    <th>Госномер</th>
+                    <th>VIN</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="container" id="history-section"
+        style="display:none; margin-top: 20px; border-top: 2px solid #eee; padding-top: 20px;">
+        <h3>История заказов для машины: <span id="selected-car-plate"></span></h3>
+        <table id="history-table">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Описание</th>
+                    <th>Статус</th>
+                    <th>Сумма</th>
+                    <th colspan="2" style="text-align: center;">Действия</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('jwt_token');
+        // Достаем ID владельца из адреса (URL)
+        const urlParams = new URLSearchParams(window.location.search);
+        const ownerId = urlParams.get('ownerId');
+
+        async function loadCars() {
+            const response = await fetch(`http://localhost:5032/api/cars/by-owner/${ownerId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const cars = await response.json();
+                const tbody = document.querySelector('#cars-table tbody');
+                cars.forEach(car => {
+                    // Добавляем data-атрибут, чтобы потом легко найти номер машины
+                    tbody.innerHTML += `<tr data-plate="${car.licensePlate}">
+                <td>${car.brand} ${car.model}</td>
+                <td>${car.licensePlate}</td>
+                <td>${car.vin}</td>
+                <td>
+                    <button type="button" onclick="createOrder(${car.id}, '${car.licensePlate}'); return false;" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">
+                        + Заказ
+                    </button>
+                    <button type="button" onclick="loadHistory('${car.licensePlate}')" style="background: #3498db; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-left: 5px;">
+                        📜 История
+                    </button>
+                </td>
+            </tr>`;
+                });
+            }
+        }
+
+        async function loadHistory(plate) {
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('selectedPlate', plate);
+            window.history.pushState({}, '', newUrl);
+
+            const response = await fetch(`http://localhost:5032/api/workorders/history/${plate}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const orders = await response.json();
+                document.getElementById('history-section').style.display = 'block';
+                document.getElementById('selected-car-plate').innerText = plate;
+
+                const tbody = document.querySelector('#history-table tbody');
+                tbody.innerHTML = ''; // Очищаем старую историю
+
+                orders.forEach(o => {
+                    const statusTranslations = {
+                        'New': '🆕 Новый',
+                        'InWork': '🛠️ В работе',
+                        'Completed': '✅ Завершен'
+                    };
+
+                    const displayStatus = statusTranslations[o.status] || o.status;
+
+                    tbody.innerHTML += `<tr>
+                    <td>${new Date(o.createdAt).toLocaleDateString()}</td>
+                    <td>${o.description}</td>
+                    <td style="font-weight: bold;">${displayStatus}</td>
+                    <td>${o.totalCost} руб.</td>
+                    <td>
+                        <button onclick="window.location.href='edit-order.html?orderId=${o.id}'" style="cursor:pointer">
+                            ⚙️ Редактировать
+                        </button>
+                    </td>
+                    <td>
+                        <button onclick="deleteOrder(${o.id}, '${plate}')" style="background:#ff4d4d; color:white; border:none; border-radius:4px; cursor:pointer; margin-left:5px;" title="Удалить">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>`;
+                });
+            }
+        }
+
+        async function createOrder(carId, plate) {
+            // Мы теперь передаем plate ПРЯМО в функцию, не нужно его искать в таблице!
+            const description = prompt(`Что нужно починить в машине ${plate}?`);
+            if (!description) return;
+
+            const newOrder = {
+                customerId: parseInt(ownerId),
+                carId: carId,
+                employeeId: 1,
+                description: description,
+                laborCost: 0,
+                partsCost: 0,
+                status: "New"
+            };
+
+            const response = await fetch('http://localhost:5032/api/workorders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(newOrder)
+            });
+
+            if (response.ok) {
+                alert("Заказ успешно открыт!");
+                alert(`Пытаюсь обновить историю для номера: ${plate}`);
+                // Теперь plate у нас уже в руках, просто обновляем историю
+                loadHistory(plate);
+            } else {
+                alert('Ошибка при создании заказа');
+            }
+        }
+
+        async function deleteOrder(id, plate) {
+            if (!confirm("Вы уверены, что хотите удалить этот заказ? Это действие необратимо.")) {
+                return;
+            }
+
+            const response = await fetch(`http://localhost:5032/api/workorders/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                alert("Заказ удален");
+                loadHistory(plate); // Обновляем таблицу истории
+            } else if (response.status === 403) {
+                alert("Ошибка: У вас недостаточно прав для удаления (нужна роль Master или Owner)");
+            } else {
+                alert("Произошла ошибка при удалении");
+            }
+        }
+
+        window.onpageshow = function (event) {
+            // Если пользователь вернулся на страницу через кнопку "Назад"
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                window.location.reload(); // Принудительно обновляем всю страницу
+            }
+        };
+
+        // Наша существующая логика запуска
+        if (ownerId) loadCars();
+
+        const savedPlate = new URLSearchParams(window.location.search).get('selectedPlate');
+        if (savedPlate) {
+            // Небольшая задержка в 100мс поможет, если API машин еще не ответило
+            setTimeout(() => loadHistory(savedPlate), 100);
+        }
+    </script>
+</body>
+
+</html>
