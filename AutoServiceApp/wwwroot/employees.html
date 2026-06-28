@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Персонал</title>
+    <link rel="stylesheet" href="style.css"> <!-- Можно вынести общие стили в один файл -->
+</head>
+
+<body>
+    <nav>
+        <a href="dashboard.html">👥 Клиенты</a>
+        <a href="employees.html">👨‍🔧 Сотрудники</a>
+        <a href="report.html">📈 Отчеты</a>
+    </nav>
+    <div class="container">
+
+        <h2>Список сотрудников</h2>
+        <table id="employees-table">
+            <thead>
+                <tr>
+                    <th>ФИО</th>
+                    <th>Телефон</th>
+                    <th>Роль</th>
+                    <th>Логин</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('jwt_token');
+        async function loadEmployees() {
+            const response = await fetch('http://localhost:5032/api/employees', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const employees = await response.json();
+                const tbody = document.querySelector('#employees-table tbody');
+                employees.forEach(e => {
+                    tbody.innerHTML += `<tr>
+                        <td>${e.fullName}</td>
+                        <td>${e.phone}</td>
+                        <td>${e.role}</td>
+                        <td>${e.username}</td>
+                    </tr>`;
+                });
+            } else {
+                alert("Доступ запрещен (только для Owner)");
+            }
+        }
+        loadEmployees();
+    </script>
+</body>
+
+</html>

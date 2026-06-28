@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Редактирование заказа</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <nav>
+        <a href="dashboard.html">👥 Клиенты</a>
+        <a href="employees.html">👨‍🔧 Сотрудники</a>
+        <a href="report.html">📈 Отчеты</a>
+    </nav>
+
+    <div class="container">
+        <a href="javascript:history.back()" style="color: #3498db; text-decoration: none;">← Назад</a>
+        <h2 style="margin-top: 10px;">Редактирование заказа #<span id="order-id-display"></span></h2>
+        <hr>
+
+        <div id="order-info" style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <!-- Сюда подгрузим инфо о машине -->
+        </div>
+
+        <div style="display: grid; gap: 15px;">
+            <div>
+                <label><b>Статус:</b></label><br>
+                <select id="status" style="width: 100%; padding: 10px; margin-top: 5px;">
+                    <option value="New">Новый</option>
+                    <option value="InWork">В работе</option>
+                    <option value="Completed">Завершен (Оплата)</option>
+                </select>
+            </div>
+
+            <div>
+                <label><b>Описание работ:</b></label><br>
+                <textarea id="description" style="width: 100%; padding: 10px; margin-top: 5px;" rows="3"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 15px;">
+                <div style="flex: 1;">
+                    <label><b>Работа (руб):</b></label>
+                    <input type="number" id="laborCost" style="width: 100%; padding: 10px;">
+                </div>
+                <div style="flex: 1;">
+                    <label><b>Запчасти (руб):</b></label>
+                    <input type="number" id="partsCost" style="width: 100%; padding: 10px;">
+                </div>
+            </div>
+
+            <button onclick="saveOrder()"
+                style="background: #27ae60; color: white; padding: 15px; font-size: 1.1rem; border-radius: 5px;">
+                ✅ Сохранить и обновить
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('jwt_token');
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('orderId');
+        let orderData = null;
+
+        async function loadOrder() {
+            const response = await fetch(`http://localhost:5032/api/workorders/${orderId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                orderData = await response.json();
+                document.getElementById('order-id-display').innerText = orderId;
+                document.getElementById('order-info').innerHTML = `
+                    <b>Машина:</b> ${orderData.car.brand} ${orderData.car.model} (${orderData.car.licensePlate})<br>
+                    <b>Клиент:</b> ${orderData.customer.name}
+                `;
+
+                // Заполняем форму текущими данными
+                document.getElementById('status').value = orderData.status;
+                document.getElementById('description').value = orderData.description;
+                document.getElementById('laborCost').value = orderData.laborCost;
+                document.getElementById('partsCost').value = orderData.partsCost;
+            }
+        }
+
+        async function saveOrder() {
+            // 1. Создаем копию объекта
+            const updatedOrder = { ...orderData };
+
+            // 2. Обновляем поля из формы
+            updatedOrder.status = document.getElementById('status').value;
+            updatedOrder.description = document.getElementById('description').value;
+            updatedOrder.laborCost = parseFloat(document.getElementById('laborCost').value) || 0;
+            updatedOrder.partsCost = parseFloat(document.getElementById('partsCost').value) || 0;
+
+            // 3. УДАЛЯЕМ вложенные объекты (это критично для PUT!)
+            delete updatedOrder.car;
+            delete updatedOrder.customer;
+            delete updatedOrder.employee;
+
+            const response = await fetch(`http://localhost:5032/api/WorkOrders/${orderId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(updatedOrder)
+            });
+
+            if (response.ok) {
+                // Добавляем параметр t (timestamp), чтобы браузер считал URL уникальным и не брал данные из кэша
+                const timestamp = new Date().getTime();
+                window.location.href = `cars.html?ownerId=${orderData.customerId}&selectedPlate=${orderData.car.licensePlate}&updated=${timestamp}`;
+            }
+            else {
+                const errorText = await response.text();
+                alert(`Ошибка ${response.status}: ${errorText}`);
+            }
+        }
+
+
+        if (orderId) loadOrder();
+    </script>
+</body>
+
+</html>

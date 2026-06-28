@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AutoServiceApp.IntegrationTests/AutoServiceApp.IntegrationTests.csproj" />
+  <Project Path="AutoServiceApp/AutoServiceApp.csproj" />
+</Solution>
